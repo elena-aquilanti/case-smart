@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Problemi e paura, Italia e Ue – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<link rel="stylesheet" href="../assets/casa.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="../assets/radar.js"></script>
+<script src="../assets/casa.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Seconda per problemi, tra le ultime per paura</h1>
+    <p class="r-sub">A sinistra: tra chi usa oggetti connessi (tv, sistemi per la casa, smartwatch, auto), quanti hanno avuto problemi di sicurezza o privacy. A destra: tra chi non usa sistemi per la casa connessi, quanti non li usano per paura che vengano violati. Paesi Ue, 2024.</p>
+  </header>
+  <div class="ctl"><label for="pick">Trova un Paese</label><select id="pick"></select></div>
+  <div class="heads">
+    <div><div class="ht">Problemi con oggetti connessi</div><div class="hn" id="h1n"></div><div class="hl" id="h1l"></div></div>
+    <div class="r"><div class="ht">Paura che la casa smart sia violata</div><div class="hn" id="h2n"></div><div class="hl" id="h2l"></div></div>
+  </div>
+  <div class="r-chart" id="c1" style="margin-top:14px"></div>
+  <p class="r-note">Sono mostrati l'Italia, i Paesi più grandi e i primi in classifica; gli altri sono nel menu. A sinistra, quota di chi usa oggetti connessi, quasi sempre di casa; a destra, di chi non usa sistemi per la casa. Problemi dichiarati dagli intervistati (attacchi o usi impropri dei dati).</p>
+  <footer class="r-foot"><span>Fonte: Eurostat, isoc_iiot_bx, 2024</span><span>Elaborazione Radar – QN</span></footer>
+</main>
+<script>
+(function () {
+  var C = CASA, f1 = C.f1, RM = C.RM;
+  Radar.loadCSV("../data/eurostat_2024.csv").then(function (rows) {
+    var N = {}, P = {}, T = {}, EU = {};
+    rows.forEach(function (r) {
+      var p = Radar.num(r.problemi), t = Radar.num(r.paura);
+      if (r.codice === "EU") { EU = { p: p, t: t }; return; }
+      N[r.codice] = r.paese; if (p != null) P[r.codice] = p; if (t != null) T[r.codice] = t;
+    });
+    var LP = Object.keys(P).sort(function (a, b) { return P[b] - P[a]; });
+    var LT = Object.keys(T).sort(function (a, b) { return T[b] - T[a]; });
+    var picked = "IT", hover = null, lock = 0;
+    var sel = document.getElementById("pick");
+    Object.keys(N).sort(function (a, b) { return N[a].localeCompare(N[b]); }).forEach(function (k) {
+      var o = document.createElement("option"); o.value = k; o.textContent = N[k]; if (k === "IT") o.selected = true; sel.appendChild(o);
+    });
+    sel.addEventListener("change", function () { picked = sel.value; hover = null; draw({ pick: true }); });
+    function hv(k) { if (Date.now() < lock || hover === k) return; hover = k; draw(); }
+    function hl() { if (Date.now() < lock) return; hover = null; draw(); }
+    function pk(k) { picked = k; sel.value = k; hover = null; lock = 0; draw({ pick: true }); }
+    function pct(v) { return f1(v) + "%"; }
+    function heads(count) {
+      var k = hover || picked, c = k === "IT" ? "var(--red)" : "var(--blue)";
+      var a = document.getElementById("h1n"), b = document.getElementById("h2n");
+      a.style.color = c; b.style.color = c;
+      d3.select(a).interrupt(); d3.select(b).interrupt();
+      if (P[k] == null) a.textContent = "n.d."; else if (count) C.countUp(a, P[k], pct, 0, 900); else a.textContent = pct(P[k]);
+      if (count) C.countUp(b, T[k], pct, 150, 900); else b.textContent = pct(T[k]);
+      document.getElementById("h1l").innerHTML = P[k] != null ? "<b>" + N[k] + "</b>, " + (LP.indexOf(k) + 1) + "ª su " + LP.length + " per problemi<br>media Ue " + f1(EU.p) + "%" : "<b>" + N[k] + "</b>: dato non disponibile";
+      document.getElementById("h2l").innerHTML = "<b>" + N[k] + "</b>, " + (LT.indexOf(k) + 1) + "ª su " + LT.length + " per paura<br>media Ue " + f1(EU.t) + "%";
+    }
+    function draw(o) {
+      o = o || {};
+      var anim = o.anim && !RM;
+      heads(o.anim || o.pick);
+      if (anim) lock = Date.now() + 2200;
+      var w = C.W("c1"); if (w < 50) return;
+      var el = d3.select("#c1").html(""), narrow = w < 560;
+      // solo Italia, i Paesi più grandi, i primi di ogni classifica, la media Ue e il Paese scelto
+      var SHOW = new Set(["IT", "DE", "FR", "ES", "PL", "NL", LP[0], LT[0], picked]);
+      var colL = LP.filter(function (k) { return SHOW.has(k); }).map(function (k) { return { k: k, v: P[k], r: LP.indexOf(k) + 1 }; }).concat([{ k: "EU", v: EU.p }]).sort(function (a, b) { return b.v - a.v; });
+      var colR = LT.filter(function (k) { return SHOW.has(k); }).map(function (k) { return { k: k, v: T[k], r: LT.indexOf(k) + 1 }; }).concat([{ k: "EU", v: EU.t }]).sort(function (a, b) { return b.v - a.v; });
+      var rh = narrow ? 30 : 34, n = Math.max(colL.length, colR.length), top = 16, h = top + (n - 1) * rh + 16;
+      var lab = narrow ? 112 : 190, xL = lab, xR = w - lab;
+      var s = el.append("svg").attr("width", w).attr("height", h).attr("role", "img")
+        .attr("aria-label", "Italia " + (LP.indexOf("IT") + 1) + "ª su " + LP.length + " per problemi con oggetti connessi (" + f1(P.IT) + "%) e " + (LT.indexOf("IT") + 1) + "ª su " + LT.length + " per paura che la casa smart sia violata (" + f1(T.IT) + "%)");
+      function y(i) { return top + i * rh; }
+      function focus(k) { return k === "IT" || k === picked || k === hover; }
+      function col(k) { return k === "IT" ? "var(--red)" : "var(--blue)"; }
+      function posL(k) { return colL.findIndex(function (d) { return d.k === k; }); }
+      function posR(k) { return colR.findIndex(function (d) { return d.k === k; }); }
+      var lines = Array.from(new Set([picked, hover].filter(function (k) { return k && k !== "IT" && posL(k) >= 0 && posR(k) >= 0; }))).concat(["IT"]);
+      lines.forEach(function (k) {
+        var y1 = y(posL(k)), y2 = y(posR(k)), mx = (xL + xR) / 2;
+        var p = s.append("path").attr("d", "M" + xL + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + xR + "," + y2)
+          .style("fill", "none").style("stroke", col(k)).style("stroke-width", k === "IT" ? 4.5 : 3.5).style("stroke-linecap", "round");
+        if (anim) C.drawIn(p, k === "IT" ? 700 : 900, 1000);
+        else if (o.pick && k === picked && !RM) C.drawIn(p, 0, 700);
+      });
+      function row(d, i, side) {
+        var yy = y(i), Lft = side === "L", x0 = Lft ? xL : xR, g = s.append("g");
+        if (d.k === "EU") {
+          g.append("circle").attr("cx", x0).attr("cy", yy).attr("r", 5).style("fill", "var(--bg)").style("stroke", "var(--ink-2)").style("stroke-width", 1.5).style("stroke-dasharray", "2 2");
+          g.append("text").attr("x", Lft ? x0 - 14 : x0 + 14).attr("y", yy + 5).attr("text-anchor", Lft ? "end" : "start").style("font-size", narrow ? "13px" : "15px").style("font-style", "italic").style("fill", "var(--ink-2)").text(Lft ? "Media Ue " + f1(d.v) : f1(d.v) + " Media Ue");
+        } else {
+          var f = focus(d.k), c = f ? col(d.k) : "var(--grey-4)";
+          g.style("cursor", "pointer").on("pointerenter", function () { hv(d.k); }).on("pointerleave", hl).on("click", function () { pk(d.k); });
+          g.append("rect").attr("x", Lft ? 0 : xR - 8).attr("y", yy - rh / 2).attr("width", lab + 8).attr("height", rh).style("fill", "transparent");
+          g.append("circle").attr("cx", x0).attr("cy", yy).attr("r", f ? 7 : 5).style("fill", c);
+          if (!narrow) g.append("text").attr("x", Lft ? 0 : w).attr("y", yy + 5).attr("text-anchor", Lft ? "start" : "end").style("font-size", "13px").style("font-weight", 600).style("fill", f ? c : "var(--ink-2)").text(d.r + "°");
+          g.append("text").attr("x", Lft ? x0 - 14 : x0 + 14).attr("y", yy + 5).attr("text-anchor", Lft ? "end" : "start")
+            .style("font-size", narrow ? (f ? "14px" : "13px") : (f ? "17px" : "15px")).style("font-weight", f ? 700 : 400).style("fill", f ? c : "var(--ink)")
+            .text(narrow ? (f ? d.r + "° " + N[d.k] + " " + f1(d.v) : d.r + "° " + N[d.k]) : (Lft ? N[d.k] + " " + f1(d.v) : f1(d.v) + " " + N[d.k]));
+        }
+        if (anim) C.fadeIn(g, Lft ? i * 60 : 250 + i * 60);
+      }
+      colL.forEach(function (d, i) { row(d, i, "L"); });
+      colR.forEach(function (d, i) { row(d, i, "R"); });
+      if (!narrow) {
+        var a = s.append("text").attr("class", "halo").attr("x", xR - 24).attr("y", y(posR("IT")) + 30).attr("text-anchor", "end").style("font-size", "15px").style("font-weight", 700).style("fill", "var(--red)")
+          .text("Italia: dal " + (LP.indexOf("IT") + 1) + "° al " + (LT.indexOf("IT") + 1) + "° posto");
+        if (anim) C.fadeIn(a, 1600, 500);
+      }
+    }
+    heads(false);
+    C.onView("c1", function (a) { draw({ anim: a }); });
+    C.onResize(function () { draw(); });
+  }).catch(function (e) { Radar.fail("#c1", e); });
+})();
+</script>
+</body>
+</html>

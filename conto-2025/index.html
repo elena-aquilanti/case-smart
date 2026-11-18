@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il conto della casa smart 2025 – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<link rel="stylesheet" href="../assets/casa.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="../assets/radar.js"></script>
+<script src="../assets/casa.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Un euro su tre va nella sicurezza</h1>
+    <p class="r-sub">Quanto hanno speso gli italiani per la casa intelligente nel 2025, per tipo di prodotto</p>
+  </header>
+  <div class="receipt" id="receipt" role="img" aria-label="">
+    <div class="rt">Il conto del 2025</div>
+    <div id="rlines"></div>
+    <div class="tot" style="--i:5"><span>Totale</span><span>1 miliardo di euro</span></div>
+    <div class="up" style="--i:5">+11% sul 2024</div>
+    <div class="callout"><svg class="coin" width="72" height="72" viewBox="0 0 72 72" aria-hidden="true"><defs><clipPath id="coinclip"><circle cx="36" cy="36" r="31"/></clipPath></defs><circle cx="36" cy="36" r="31" style="fill:var(--grey-5)"/><rect id="coinfill" x="0" y="45.1" width="72" height="21.9" clip-path="url(#coinclip)" style="fill:var(--red)"/><circle cx="36" cy="36" r="31" style="fill:none;stroke:var(--ink);stroke-width:2.5"/><circle cx="36" cy="36" r="25" style="fill:none;stroke:var(--ink);stroke-width:1;stroke-dasharray:2 3;opacity:.5"/><text x="36" y="45" text-anchor="middle" style="font-family:var(--sans);font-size:28px;font-weight:700;fill:var(--ink)">€</text></svg><span class="tx"><b class="hl1">1 euro su 3</b> va in videocamere, sensori, videocitofoni e serrature: gli oggetti che, se violati, aprono la casa</span></div>
+  </div>
+  <p class="r-note" style="margin-top:24px">«Altri prodotti» riunisce sei voci minori: casse audio (7%), interruttori (6%), lampadine (6%), assistenza alla persona, tapparelle e prese smart (2% ciascuna). Per queste il Politecnico dà solo la quota.</p>
+  <footer class="r-foot"><span>Fonte: Osservatorio Internet of Things, Politecnico di Milano</span><span>Elaborazione Radar – QN</span></footer>
+</main>
+<script>
+(function () {
+  var C = CASA;
+  var ICON = {
+    cam: '<rect x="3" y="8" width="17" height="12" rx="2"/><path d="M20 12l6-3v10l-6-3z"/><circle cx="11.5" cy="14" r="3"/>',
+    wash: '<rect x="5" y="3" width="20" height="24" rx="2"/><circle cx="15" cy="17" r="6"/><path d="M8 7h4"/>',
+    term: '<path d="M13 4a3 3 0 016 0v13a6 6 0 11-6 0z"/><path d="M16 10v11"/>',
+    spk: '<rect x="8" y="3" width="14" height="24" rx="7"/><circle cx="15" cy="18" r="3"/><circle cx="15" cy="9" r="1"/>',
+    more: '<circle cx="8" cy="15" r="2"/><circle cx="15" cy="15" r="2"/><circle cx="22" cy="15" r="2"/>'
+  };
+  var receipt = document.getElementById("receipt"), rl = document.getElementById("rlines");
+  if (!C.RM) receipt.classList.add("pre");
+  Radar.loadCSV("../data/spesa_2025.csv").then(function (rows) {
+    var R = rows.map(function (r) { return { v: r.voce, d: r.descrizione, m: Radar.num(r.milioni), q: Radar.num(r.quota), ic: r.icona, hot: r.evidenza === "1" }; });
+    var max = d3.max(R, function (r) { return r.q; });
+    receipt.setAttribute("aria-label", "Spesa per la casa intelligente in Italia nel 2025: " + R.map(function (r) { return r.v + (r.m != null ? " " + r.m + " milioni di euro," : "") + " " + r.q + " per cento"; }).join("; ") + "; totale 1 miliardo");
+    R.forEach(function (r, i) {
+      var d = document.createElement("div"); d.className = "rl"; d.style.setProperty("--i", i);
+      var c = r.hot ? "var(--red)" : "var(--ink-2)";
+      d.innerHTML = '<div class="row' + (r.hot ? " hot" : "") + '"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" style="fill:none;stroke:' + c + ';stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round">' + ICON[r.ic] + '</svg><span class="it">' + r.v + '</span><span class="eu">' + (r.m != null ? r.m + " mln €" : "–") + '</span><span class="pc2">' + r.q + '%</span><span class="ds">' + r.d + '</span><span class="bar"><i style="width:' + (r.q / max * 100) + '%"></i></span></div>';
+      rl.appendChild(d);
+    });
+    Radar.scheduleHeight();
+    C.onView("rlines", function (a) {
+      if (!a) return;
+      receipt.classList.add("printing"); receipt.classList.remove("pre");
+      rl.querySelectorAll(".rl").forEach(function (d, i) {
+        var r = R[i];
+        if (r.m != null) C.countUp(d.querySelector(".eu"), r.m, function (v) { return Math.round(v) + " mln €"; }, i * 170 + 200, 800);
+        C.countUp(d.querySelector(".pc2"), r.q, function (v) { return Math.round(v) + "%"; }, i * 170 + 200, 800);
+      });
+      setTimeout(function () { receipt.classList.remove("printing"); }, 3000);
+    });
+  }).catch(function (e) { receipt.classList.remove("pre"); Radar.fail(".radar", e); });
+})();
+</script>
+</body>
+</html>

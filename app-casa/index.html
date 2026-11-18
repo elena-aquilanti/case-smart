@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le app che aprono la porta di casa – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<link rel="stylesheet" href="../assets/casa.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="../assets/radar.js"></script>
+<script src="../assets/casa.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Le app che aprono la porta di casa hanno tutte una falla</h1>
+    <p class="r-sub">App Android per comandare serrature, telecamere e allarmi analizzate in uno studio universitario, 2024</p>
+  </header>
+  <div class="g4">
+    <div class="r-chart" id="c4" style="margin:0"></div>
+    <div class="txt">
+      <button class="stat" type="button" data-k="all" aria-pressed="false"><span class="n" id="n4"></span><span class="sl">app con almeno una vulnerabilità. Ogni app ha il suo pallino rosso.</span></button>
+      <button class="stat old" type="button" data-k="old" aria-pressed="false"><span class="n" id="n4b"></span><span class="sl">usavano componenti di altri produttori non aggiornati</span></button>
+      <p class="hint4">Tocchi un numero per vedere le app sul telefono.</p>
+    </div>
+  </div>
+  <p class="r-note">Vulnerabilità: falle note o potenziali individuate dall'analisi automatica delle app, non attacchi avvenuti. Lo studio riguarda solo app per Android.</p>
+  <footer class="r-foot"><span>Fonte: Allen, Mylonas, Vidalis e Gritzalis, Sensors, 2024</span><span>Elaborazione Radar – QN</span></footer>
+</main>
+<script>
+(function () {
+  var C = CASA, RM = C.RM;
+  var host = document.getElementById("c4"), tip = C.tip(host);
+  Radar.loadCSV("../data/app_studio.csv").then(function (rows) {
+    var TOT = Radar.num(rows[0].valore), VUL = Radar.num(rows[1].valore), OLD = Radar.num(rows[2].valore);
+    // posizione delle app con componenti vecchi: distribuite sulla griglia, solo per l'illustrazione
+    var old = new Set(d3.range(OLD).map(function (i) { return Math.round((i + 0.5) * TOT / OLD) - 1; }));
+    var n4 = document.getElementById("n4"), n4b = document.getElementById("n4b");
+    function lab() { return VUL + " su " + TOT; }
+    function draw(anim) {
+      anim = anim && !RM;
+      d3.select(host).select("svg").remove();
+      var pw = 220, cols = 6, pad = 18, top = 58, gap = 7, nr = Math.ceil(TOT / cols);
+      var cs = (pw - 2 * pad - (cols - 1) * gap) / cols, ph = Math.round(top + nr * (cs + gap) + 28);
+      var s = d3.select(host).insert("svg", ":first-child").attr("width", pw).attr("height", ph).attr("role", "img")
+        .attr("aria-label", "Telefono con " + TOT + " app per la casa: " + VUL + " con almeno una vulnerabilità, " + OLD + " con componenti non aggiornati");
+      s.append("rect").attr("x", 2).attr("y", 2).attr("width", pw - 4).attr("height", ph - 4).attr("rx", 34).style("fill", "var(--ink)");
+      s.append("rect").attr("x", 9).attr("y", 9).attr("width", pw - 18).attr("height", ph - 18).attr("rx", 27).style("fill", "var(--bg)");
+      s.append("rect").attr("x", pw / 2 - 30).attr("y", 17).attr("width", 60).attr("height", 16).attr("rx", 8).style("fill", "var(--ink)");
+      s.append("text").attr("x", pw / 2).attr("y", 50).attr("text-anchor", "middle").style("font-size", "11px").style("font-weight", 600).style("letter-spacing", ".04em").style("fill", "var(--ink-2)").text("APP PER LA CASA");
+      var house = "M" + cs / 2 + "," + cs * 0.24 + " L" + cs * 0.76 + "," + cs * 0.46 + " V" + cs * 0.76 + " H" + cs * 0.24 + " V" + cs * 0.46 + " Z";
+      d3.range(TOT).forEach(function (i) {
+        var c = i % cols, rr = Math.floor(i / cols), o = old.has(i);
+        var g = s.append("g").attr("class", "app").datum(o).attr("transform", "translate(" + (pad + c * (cs + gap)) + "," + (top + rr * (cs + gap)) + ")")
+          .on("pointerenter pointermove", function (e) { tip.show(e, Radar.tipHTML({ title: "App " + (i + 1) + " di " + TOT, rows: [["Almeno una vulnerabilità", "sì"]].concat(o ? [["Componenti non aggiornati", "sì"]] : []) })); })
+          .on("pointerleave", tip.hide);
+        var tile = g.append("rect").attr("width", cs).attr("height", cs).attr("rx", 8).style("fill", o ? "var(--red)" : "var(--blue)");
+        g.append("path").attr("d", house).style("fill", "none").style("stroke", "#fff").style("stroke-width", 1.6).style("stroke-linejoin", "round");
+        var dot = g.append("circle").attr("cx", cs - 1).attr("cy", 1).attr("r", 4.5).style("fill", "var(--red)").style("stroke", "var(--bg)").style("stroke-width", 2);
+        if (anim) {   // prima le app, poi il pallino rosso su ognuna, poi quelle con componenti vecchi
+          C.fadeIn(g, i * 16, 250);
+          dot.attr("r", 0).transition().delay(1000 + i * 14).duration(300).ease(d3.easeBackOut.overshoot(3)).attr("r", 4.5);
+          if (o) tile.style("fill", "var(--blue)").transition().delay(2000 + i * 10).duration(400).style("fill", "var(--red)");
+        }
+      });
+      if (anim) { C.countUp(n4, VUL, function (v) { return Math.round(v) + " su " + TOT; }, 900, 900); C.countUp(n4b, OLD, function (v) { return String(Math.round(v)); }, 2000, 700); }
+      else { n4.textContent = lab(); n4b.textContent = OLD; }
+      apply();
+    }
+    var sel = null;
+    function apply() {
+      d3.selectAll("#c4 .app").style("opacity", function (o) { return sel === "old" && !o ? .2 : 1; });
+    }
+    document.querySelectorAll(".stat").forEach(function (b) {
+      b.addEventListener("click", function () {
+        sel = sel === b.dataset.k ? null : b.dataset.k;
+        document.querySelectorAll(".stat").forEach(function (x) { x.setAttribute("aria-pressed", x.dataset.k === sel ? "true" : "false"); });
+        document.querySelector(".g4 .txt").classList.toggle("sel", !!sel);
+        apply();
+        if (sel === "all" && !RM) d3.selectAll("#c4 .app circle").interrupt().attr("r", 2).transition().duration(450).ease(d3.easeBackOut.overshoot(3)).attr("r", 4.5);
+      });
+    });
+    n4.textContent = lab(); n4b.textContent = OLD;
+    C.onView("c4", function (a) { draw(a); });
+  }).catch(function (e) { Radar.fail("#c4", e); });
+})();
+</script>
+</body>
+</html>

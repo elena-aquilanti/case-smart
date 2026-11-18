@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dieci anni di spesa per la casa smart – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<link rel="stylesheet" href="../assets/casa.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="../assets/radar.js"></script>
+<script src="../assets/casa.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">In dieci anni la spesa è più che quintuplicata e la sicurezza corre di più</h1>
+    <p class="r-sub">Spesa degli italiani per la casa intelligente, in milioni di euro</p>
+  </header>
+  <div class="leg3" aria-hidden="true"><span><i class="sq" style="background:var(--red)"></i>Sicurezza: videocamere, sensori, videocitofoni, serrature</span><span><i class="sq" style="background:var(--blue)"></i>Tutto il resto</span><span><i class="sq" style="background:var(--blue-4)"></i>Totale, senza divisione (fino al 2020)</span></div>
+  <div class="r-chart" id="c5a" style="margin-top:8px"></div>
+  <div class="nav"><span class="hint">Passi sulle pile per leggere i valori di ogni anno. Ogni moneta vale 25 milioni.</span><button id="replay" type="button">↻ Rivedi</button></div>
+  <p class="r-note">La divisione per tipo di prodotto è disponibile dal 2021. Le quote della sicurezza 2023-2025 sono quelle pubblicate dal Politecnico; quelle 2021-2022 sono nostri calcoli sui suoi dati.</p>
+  <footer class="r-foot"><span>Fonte: Osservatorio Internet of Things, Politecnico di Milano</span><span>Elaborazione Radar – QN</span></footer>
+</main>
+<script>
+(function () {
+  var C = CASA, RM = C.RM, EASE = C.EASE;
+  var host = document.getElementById("c5a"), tip = C.tip(host);
+  Radar.loadCSV("../data/serie_spesa.csv").then(function (rows) {
+    var ST = [], SEC = {}, SH = {}, CRS = {};
+    rows.forEach(function (r) {
+      var y = +r.anno; ST.push([y, Radar.num(r.totale)]);
+      if (Radar.num(r.sicurezza) != null) { SEC[y] = Radar.num(r.sicurezza); SH[y] = Radar.num(r.quota_sicurezza); }
+      CRS[y] = Radar.num(r.crescita);
+    });
+    var LAST = ST[ST.length - 1][0], MAX = d3.max(ST, function (d) { return d[1]; });
+    function fmtM(v) { return v >= 1000 ? Radar.fmt(v / 1000, 0) + " mld" : String(Math.round(v)); }
+    function tipFor(yv, v) {
+      var rows2 = [["Rispetto all'anno prima", (CRS[yv] > 0 ? "+" : "") + CRS[yv] + "%"]];
+      if (SEC[yv]) rows2.push(["Sicurezza", SEC[yv] + " mln, " + SH[yv] + "%"]);
+      return Radar.tipHTML({ title: String(yv), value: v >= 1000 ? "1 miliardo" : v + " milioni", unit: "di euro", rows: rows2, note: SEC[yv] ? null : "Divisione per tipo di prodotto non disponibile" });
+    }
+    function draw(anim) {
+      anim = anim && !RM;
+      var w = C.W("c5a"); if (w < 50) return;
+      var el = d3.select("#c5a"); el.select("svg").remove(); var narrow = w < 560;
+      var H = narrow ? 330 : 410, top = 68, bot = 30;
+      var x = d3.scaleBand(ST.map(function (d) { return d[0]; }), [0, w]).paddingInner(narrow ? .26 : .36).paddingOuter(.08);
+      var bw = x.bandwidth(), rx = bw / 2, ry = Math.min(rx * .3, 8);
+      var y = d3.scaleLinear([0, MAX], [H - bot, top + ry]);
+      var s = el.insert("svg", ":first-child").attr("width", w).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Spesa per la casa smart in Italia: da " + ST[0][1] + " milioni di euro nel " + ST[0][0] + " a 1 miliardo nel " + LAST + "; la sicurezza passa da " + SEC[2021] + " milioni nel 2021 a " + SEC[LAST] + " nel " + LAST);
+      // bordo zigrinato delle monete
+      var defs = s.append("defs");
+      [["mb", "var(--blue)"], ["mr", "var(--red)"], ["ml", "var(--blue-4)"]].forEach(function (p) {
+        var pt = defs.append("pattern").attr("id", p[0]).attr("patternUnits", "userSpaceOnUse").attr("width", 3).attr("height", 10);
+        pt.append("rect").attr("width", 3).attr("height", 10).style("fill", p[1]);
+        pt.append("rect").attr("width", 1).attr("height", 10).style("fill", "#000").style("opacity", .18);
+      });
+      var FACE = { mb: ["var(--blue-3)", "var(--blue-1)"], mr: ["var(--red-4)", "var(--red)"], ml: ["var(--blue-5)", "var(--blue-3)"] };
+      var J = [0, 1.2, -.8, .6, -1.4, .9, -.4, 1.5, -1.1, .3, -.6, 1.1];   // monete impilate a mano
+      function coin(x0, va, vb) {
+        var ya = y(va), yb = y(vb), x1 = x0 + bw;
+        return "M" + x0 + "," + yb + " V" + ya + " A" + rx + "," + ry + " 0 0 0 " + x1 + "," + ya + " V" + yb + " A" + rx + "," + ry + " 0 0 1 " + x0 + "," + yb + " Z";
+      }
+      var UNIT = 25; // una moneta ogni 25 milioni
+      var cols = s.selectAll("g.col").data(ST).join("g").attr("class", "col").style("cursor", "pointer");
+      function paint(g, d, f) {
+        var yr = d[0], v = d[1] * f, sc = SEC[yr] ? SEC[yr] * f : 0, x0 = x(yr);
+        g.selectAll("*").remove();
+        var k = 0, last = "ml", jx = 0;
+        function stack(from, to, pat) {
+          for (var a = from; a < to - 0.01; a += UNIT) {
+            var b = Math.min(a + UNIT, to); jx = J[(yr + k) % J.length]; k++; last = pat;
+            g.append("path").attr("d", coin(x0 + jx, a, b)).style("fill", "url(#" + pat + ")").style("stroke", "var(--bg)").style("stroke-width", .9);
+          }
+        }
+        if (sc) stack(0, sc, "mr");
+        stack(sc, v, SEC[yr] ? "mb" : "ml");
+        if (v > 0) {
+          var cx = x0 + rx + jx, cy = y(v), fc = FACE[last][0], rc = FACE[last][1];
+          g.append("ellipse").attr("cx", cx).attr("cy", cy).attr("rx", rx).attr("ry", ry).style("fill", fc).style("stroke", "var(--bg)").style("stroke-width", .9);
+          g.append("ellipse").attr("cx", cx).attr("cy", cy).attr("rx", rx * .74).attr("ry", ry * .74).style("fill", "none").style("stroke", rc).style("stroke-width", 1).style("opacity", .7);
+          if (bw > 24) g.append("text").attr("x", cx).attr("y", cy + ry * .45).attr("text-anchor", "middle").style("font-size", Math.max(9, ry * 1.25) + "px").style("font-weight", 700).style("fill", rc).text("€");
+        }
+        if (sc && y(0) - y(sc) > 22) g.append("text").attr("x", x0 + rx).attr("y", (y(0) + y(sc)) / 2 + 5).attr("text-anchor", "middle").style("font-size", narrow ? "11px" : "13px").style("font-weight", 700).style("fill", "#fff").style("paint-order", "stroke").style("stroke", "var(--red)").style("stroke-width", 3).text(Math.round(sc));
+      }
+      cols.each(function (d, i) {
+        var g = d3.select(this);
+        if (anim) { paint(g, d, 0); g.transition().delay(i * 130).duration(800).ease(EASE).tween("grow", function () { return function (t) { paint(g, d, t); }; }); }
+        else paint(g, d, 1);
+      })
+        .on("pointerenter pointermove", function (e, d) { cols.style("opacity", function (c) { return c === d ? 1 : .28; }); tip.show(e, tipFor(d[0], d[1])); })
+        .on("pointerleave", function () { cols.style("opacity", 1); tip.hide(); });
+      // la linea della crescita, appena sopra le pile
+      var pts = ST.map(function (d) { return [x(d[0]) + rx, y(d[1]) - ry - 9]; });
+      var gl = s.append("g").style("pointer-events", "none");
+      var ln = gl.append("path").attr("d", d3.line().curve(d3.curveMonotoneX)(pts)).style("fill", "none").style("stroke", "var(--ink)").style("stroke-width", 2.5).style("stroke-linecap", "round");
+      var nL = ST.length - 1;
+      var dots = gl.selectAll("circle").data(pts).join("circle").attr("cx", function (p) { return p[0]; }).attr("cy", function (p) { return p[1]; }).attr("r", function (p, i) { return i === nL ? 6.5 : 4; }).style("fill", "var(--ink)").style("stroke", "var(--bg)").style("stroke-width", 2);
+      var labs = gl.selectAll("text.vl").data(ST).join("text").attr("class", "vl halo")
+        .attr("x", function (d) { return x(d[0]) + rx; }).attr("y", function (d, i) { return pts[i][1] - (i === nL ? 14 : 11); })
+        .attr("text-anchor", function (d, i) { return i === nL ? "end" : "middle"; }).attr("dx", function (d, i) { return i === nL ? rx + 2 : 0; })
+        .style("font-size", function (d, i) { return i === nL ? (narrow ? "19px" : "26px") : (narrow ? "12px" : "14px"); })
+        .style("font-weight", function (d, i) { return i === nL ? 800 : 600; }).text(function (d) { return fmtM(d[1]); });
+      if (anim) {
+        C.drawIn(ln, 1500, 1100);
+        dots.each(function (p, i) { C.fadeIn(d3.select(this), 1500 + i * 110, 250); });
+        labs.each(function (d, i) { C.fadeIn(d3.select(this), 1550 + i * 110, 300); });
+      }
+      s.selectAll("text.yr").data(ST).join("text").attr("class", "yr").attr("x", function (d) { return x(d[0]) + rx; }).attr("y", H - 8).attr("text-anchor", "middle").style("font-size", narrow ? "11.5px" : "13px").style("font-weight", 600).style("fill", "var(--ink-2)").text(function (d) { return narrow ? "’" + String(d[0]).slice(2) : d[0]; });
+      var i20 = ST.findIndex(function (d) { return d[0] === 2020; });
+      if (!narrow && i20 >= 0) {
+        var a = gl.append("text").attr("class", "halo").attr("x", x(2020) + rx).attr("y", pts[i20][1] - 30).attr("text-anchor", "middle").style("font-size", "12px").style("fill", "var(--ink-2)").text("Covid: " + Radar.fmt(CRS[2020], 0) + "%");
+        if (anim) C.fadeIn(a, 2600, 400);
+      }
+    }
+    C.onView("c5a", function (a) { draw(a); });
+    document.getElementById("replay").onclick = function () { draw(true); };
+    C.onResize(function () { draw(false); });
+  }).catch(function (e) { Radar.fail("#c5a", e); });
+})();
+</script>
+</body>
+</html>
